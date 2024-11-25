@@ -1,0 +1,14 @@
+# Lesson Plan Input Data
+
+- grade_level: 5th grade
+- subject: mathematics
+- topic: Mathematical Fractions
+- duration: 1 hour
+- skill_level: beginner
+- resources: whiteboard, pencils and pens
+- curriculum_standards: none
+- lesson_structure: Inquiry Based
+- homework_required: false
+
+Generate a comprehensive lesson plan based on the above input data. The plan should include learning objectives, warm-up activity, main lesson content, assessment strategies, wrap-up activity, time allocations, suggested materials, and differentiation strategies. If homework_required is true, include homework or extended learning activities.
+
