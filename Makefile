@@ -47,10 +47,11 @@ bash: build
 export_model: build
 	@echo "Exporting model $(MODEL_NAME) to directory $(EXPORT_DIR)..."
 	@docker run $(DOCKER_RUN_OPTS) \
-            optimum-cli export openvino --trust-remote-code \
-	    --task text-generation-with-past --weight-format int4 --group-size 64 --ratio 1.0 --sym \
-	    --awq --scale-estimation --all-layers \
-            --model $(MODEL_NAME) $(EXPORT_DIR)
+            optimum-cli export openvino \
+		--weight-format int4 --group-size 128 --ratio 1.0 \
+		--sym --dataset "wikitext2" --all-layers --disable-stateful \
+		--cache_dir /workspace/.cache \
+            	--model $(MODEL_NAME) $(EXPORT_DIR)
 
 run: build
 	@echo "Benchmarking the model $(MODEL_NAME) with $(PROMPT_FILE) ..."
