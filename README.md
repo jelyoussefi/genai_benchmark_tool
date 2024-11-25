@@ -3,7 +3,8 @@
 The GenAI Benchmark Tool is designed to evaluate and benchmark AI models efficiently. This tool leverages Docker and Makefile to ensure a seamless setup process and reproducible results.
 
 ## Prerequisites
-
+- Graphics drivers installation: [Intel Graphics Drivers](https://dgpu-docs.intel.com/driver/client/overview.html)
+- NPU driver installation: [Intel NPU Drivers](https://github.com/intel/linux-npu-driver/releases)
 Before using this tool, ensure the following are installed:
 
 - [Docker](https://www.docker.com/)
@@ -89,3 +90,26 @@ Contributions are welcome! Please fork the repository and submit a pull request 
 ---
 
 Happy benchmarking!
+
+## Environment Variables
+
+| Environment Variable | Default Value |
+|----------------------|---------------|
+| CURRENT_DIR : | $(shell pwd) |
+| CACHE_DIR : | $(CURRENT_DIR)/.cache |
+| DOCKER_IMAGE_NAME | genait_benchmark_tool |
+| MODEL_NAME ? | meta-llama/Meta-Llama-3-8B |
+| EXPORT_DIR : | $(shell echo $(MODEL_NAME) | awk -F/ '{print $$2}') |
+| PROMPT_FILE ? | user_prompt.txt |
+| DEVICE ? | GPU |
+| HF_TOKEN ? | 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 |
+| DOCKER_RUN_OPTS | \ |
+| -e http_proxy | $(HTTP_PROXY) \ |
+| -e https_proxy | $(HTTPS_PROXY) \ |
+| -e no_proxy | $(NO_PROXY) \ |
+| -e EXPORT_DIR | $(EXPORT_DIR) \ |
+| -e HF_HOME | /root/.huggingface \ |
+| -e HF_TOKEN | $(HF_TOKEN) \ |
+| --build-arg http_proxy | ${HTTP_PROXY} \ |
+| --build-arg https_proxy | ${HTTPS_PROXY} \ |
+| --build-arg no_proxy | ${NO_PROXY} |
