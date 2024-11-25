@@ -55,13 +55,15 @@ def main():
     # Initialize pipeline
     pipe = openvino_genai.LLMPipeline(args.model_dir, args.device)
     config = openvino_genai.GenerationConfig()
-    config.max_new_tokens = 100
-
+    config.max_new_tokens = 256
+    #config.num_beam_groups = 1
+    #config.num_beams = 15
+    config.diversity_penalty = 1.0
     # Benchmarking
     pipe.start_chat()
     start_time = time.time()
     try:
-        pipe.generate(prompt_content, config, streamer)
+        pipe.generate(prompt_content) #, config, streamer)
     finally:
         end_time = time.time()
         pipe.finish_chat()

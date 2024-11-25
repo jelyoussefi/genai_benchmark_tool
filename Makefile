@@ -4,7 +4,6 @@ CACHE_DIR := $(CURRENT_DIR)/.cache
 DOCKER_IMAGE_NAME = genait_benchmark_tool
 
 MODEL_NAME ?= meta-llama/Meta-Llama-3-8B
-#MODEL_NAME ?= TinyLlama/TinyLlama-1.1B-Chat-v1.0
 EXPORT_DIR := $(shell echo $(MODEL_NAME) | awk -F/ '{print $$2}')
 PROMPT_FILE ?= user_prompt.txt
 
@@ -23,7 +22,7 @@ DOCKER_RUN_OPTS = \
     -e https_proxy=$(HTTPS_PROXY) \
     -e no_proxy=$(NO_PROXY) \
     -e EXPORT_DIR=$(EXPORT_DIR) \
-    -e HF_HOME=/root/.huggingface \
+    -e HF_HOME=/root/.cache \
     -e HF_TOKEN=$(HF_TOKEN) \
     $(DOCKER_IMAGE_NAME)
 
@@ -39,23 +38,29 @@ build:
                 --build-arg https_proxy=${HTTPS_PROXY} \
                 --build-arg no_proxy=${NO_PROXY}
 
-# Open a bash shell in the container
+# Reformat the model using Hugging Face transformers library
+reformat_model: build
+	@echo "Reformatting model $(MODEL_NAME) for proper pipeline structure..."
+	@docker run $(DOCKER_RUN_OPTS) \
+            python3 reformat_model.py --model_name $(MODEL_NAME)  --cache_dir /workspace/.cache
+
+# Export the model using optimum-cli with original parameters
+export_model: 
+	@echo "Exporting model $(MODEL_NAME) to directory $(EXPORT_DIR)..."
+	@docker run $(DOCKER_RUN_OPTS) \
+            optimum-cli export openvino --task text-generation-with-past \
+                --weight-format int4  \
+                --cache_dir /root/.cache \
+                --model  $(MODEL_NAME) $(EXPORT_DIR)
+
+# Benchmark the model
+run: export_model
+	@echo "Benchmarking the model $(MODEL_NAME) with $(PROMPT_FILE) ..."
+	@docker run $(DOCKER_RUN_OPTS) \
+                ./benchmark_tool.py --model_dir $(EXPORT_DIR) \
+                                --prompt $(PROMPT_FILE) \
+                                --device $(DEVICE)
+
 bash: build
 	@docker run $(DOCKER_RUN_OPTS) bash
 
-# Export the model using optimum-cli
-export_model: build
-	@echo "Exporting model $(MODEL_NAME) to directory $(EXPORT_DIR)..."
-	@docker run $(DOCKER_RUN_OPTS) \
-            optimum-cli export openvino \
-		--weight-format int4 --group-size 128 --ratio 1.0 \
-		--sym --dataset "wikitext2" --all-layers --disable-stateful \
-		--cache_dir /workspace/.cache \
-            	--model $(MODEL_NAME) $(EXPORT_DIR)
-
-run: build
-	@echo "Benchmarking the model $(MODEL_NAME) with $(PROMPT_FILE) ..."
-	@docker run $(DOCKER_RUN_OPTS) \
-		./benchmark_tool.py --model_dir  $(EXPORT_DIR) \
-	                        --prompt $(PROMPT_FILE) \
-			        --device $(DEVICE)
