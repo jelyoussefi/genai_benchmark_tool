@@ -46,4 +46,4 @@ RUN pip3 install --extra-index-url https://download.pytorch.org/whl/cpu \
 	"git+https://github.com/huggingface/optimum-intel.git" \
 	"git+https://github.com/openvinotoolkit/nncf.git" "onnx<=1.16.1"
 
-RUN pip3 install tabulate
+RUN pip3 install tabulate fire

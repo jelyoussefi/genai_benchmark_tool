@@ -1,87 +1,98 @@
 #!/usr/bin/env python3
 # Benchmarking tool for Hugging Face models with OpenVINO
-import argparse
-import json
 import time
-from pathlib import Path
 from tabulate import tabulate  # For table formatting
 import openvino_genai
+import fire  # For argument parsing
+from utils import ensure_chat_template, get_device_name  # Importing functions from utils.py
 
+# Color variables
+RED = "\033[31m"
+GREEN = "\033[32m"
+RESET = "\033[0m"
+
+# Global variable to count tokens
+token_count = 0
+generated_answer = ""  # Variable to store the generated answer
 
 def streamer(subword):
-    global token_count
+    global token_count, generated_answer
     token_count += len(subword.split())
+    generated_answer += subword  # Capture the generated subword/response
     return False  # Continue generation
 
 
-def ensure_chat_template(model_dir):
-    """Ensure chat_template exists in tokenizer_config.json."""
-    tokenizer_config_path = Path(model_dir) / "tokenizer_config.json"
-    if not tokenizer_config_path.exists():
-        raise FileNotFoundError(f"Tokenizer configuration file not found at {tokenizer_config_path}")
+class BenchmarkingTool:
+    def __init__(self, model_dir, prompt, device="GPU"):
+        self.model_dir = model_dir
+        self.prompt = prompt
+        self.device = device
 
-    # Load configuration
-    with open(tokenizer_config_path, "r") as file:
-        config = json.load(file)
+    def run(self):
+        """Run the benchmarking tool."""
+        global token_count, generated_answer
+        token_count = 0  # Initialize token counter
+        generated_answer = ""  # Reset generated answer
 
-    # Add chat_template if missing
-    if "chat_template" not in config:
-        config["chat_template"] = json.dumps({
-            "system": "You are a helpful assistant.",
-            "user": "User: {input}",
-            "assistant": "Assistant: {response}"
-        })
-        with open(tokenizer_config_path, "w") as file:
-            json.dump(config, file, indent=4)
+        # Ensure chat_template exists
+        ensure_chat_template(self.model_dir)
+
+        # Load the prompt
+        with open(self.prompt, "r") as file:
+            prompt_content = file.read().strip()
+
+        # Initialize pipeline
+        pipe = openvino_genai.LLMPipeline(self.model_dir, self.device)
+        config = openvino_genai.GenerationConfig()
+        #config.max_new_tokens = 1000
+
+        # Benchmarking
+        pipe.start_chat()
+        start_time = time.time()
+        try:
+            pipe.generate(prompt_content, config, streamer)
+        finally:
+            end_time = time.time()
+            pipe.finish_chat()
+
+        # Calculate metrics
+        inferencing_time = end_time - start_time
+        tokens_per_second = token_count / inferencing_time if inferencing_time > 0 else 0
+
+        # Get device name
+        device_name = get_device_name(self.device)
+
+        # Tabular Output
+        results = [
+            ["Model", self.model_dir],
+            ["Device", self.device],  # General device classification (CPU, GPU)
+            ["Device Name", device_name],  # Detailed device name
+            ["Inference Time (s)", f"{inferencing_time:.2f}"],
+            ["Tokens/s", f"{GREEN}{tokens_per_second:.2f}{RESET}"]  # Green colored tokens/s
+        ]
+
+        # Print an empty line and the results with "Benchmark Results:" in red
+        print()  # Empty line
+        print(f"{RED}Benchmark Results:{RESET}")  # "Benchmark Results:" in red
+        print(tabulate(results, tablefmt="grid"))
+
+        # Print the generated answer
+        print(f"\n{RED}Generated Answer:{RESET}\n{generated_answer}\n")
+
+        # Print two empty lines after the table
+        print()  # Empty line
+        print()  # Another empty line
 
 
-def main():
-    global token_count
-    token_count = 0  # Initialize token counter
-
-    parser = argparse.ArgumentParser(description="Benchmarking tool for Hugging Face models with OpenVINO")
-    parser.add_argument("--model_dir", required=True, help="Path to the model directory")
-    parser.add_argument("--prompt", required=True, help="Path to the file containing the test prompt")
-    parser.add_argument("--device", default="CPU", help="Device to run the model on (default: CPU)")
-    args = parser.parse_args()
-
-    # Ensure chat_template exists
-    ensure_chat_template(args.model_dir)
-
-    # Load the prompt
-    with open(args.prompt, "r") as file:
-        prompt_content = file.read().strip()
-
-    # Initialize pipeline
-    pipe = openvino_genai.LLMPipeline(args.model_dir, args.device)
-    config = openvino_genai.GenerationConfig()
-    config.max_new_tokens = 256
-    #config.num_beam_groups = 1
-    #config.num_beams = 15
-    config.diversity_penalty = 1.0
-    # Benchmarking
-    pipe.start_chat()
-    start_time = time.time()
-    try:
-        pipe.generate(prompt_content) #, config, streamer)
-    finally:
-        end_time = time.time()
-        pipe.finish_chat()
-
-    # Calculate metrics
-    inferencing_time = end_time - start_time
-    tokens_per_second = token_count / inferencing_time if inferencing_time > 0 else 0
-
-    # Tabular Output
-    results = [
-        ["Model", args.model_dir],
-        ["Device", args.device],
-        ["Inference Time (s)", f"{inferencing_time:.2f}"],
-        ["Tokens/s", f"{tokens_per_second:.2f}"]
-    ]
-    print("\nBenchmark Results:")
-    print(tabulate(results, tablefmt="grid"))
+def main(
+    model_dir: str,
+    prompt: str,
+    device: str = "GPU",
+):
+    """Benchmarking the Hugging Face model with OpenVINO."""
+    tool = BenchmarkingTool(model_dir=model_dir, prompt=prompt, device=device)
+    tool.run()
 
 
 if __name__ == "__main__":
-    main()
+    fire.Fire(main)
