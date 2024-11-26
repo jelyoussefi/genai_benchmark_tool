@@ -36,8 +36,8 @@ class BenchmarkingTool:
         """Initialize Ollama server and download the model if not already available."""
         try:
             print("Initializing Ollama server...")
-            subprocess.Popen("./ollama serve > ollama.log 2>&1 &", shell=True)
-            time.sleep(5)  # Wait for the server to initialize
+            subprocess.Popen("init-ollama && ./ollama serve > ollama.log 2>&1 &", shell=True)
+            time.sleep(1)  # Wait for 1 second for the server to initialize
 
             # Check server readiness
             for i in range(10):  # Retry for up to 10 seconds
@@ -83,20 +83,17 @@ class BenchmarkingTool:
             self.initialize_ollama()
             start_time = time.time()
             try:
-                # Use the Ollama Python client for chat
-                response = ollama.chat(
+                # Use the Ollama Python client for run
+                response = ollama.run(
                     model=self.model_name,
-                    messages=[
-                        {"role": "system", "content": self.system_prompt},
-                        {"role": "user", "content": prompt_content}
-                    ]
+                    prompt=full_prompt
                 )
                 print("Received response from Ollama.")
                 end_time = time.time()
                 generated_answer = response["content"]  # Extract generated content
                 inferencing_time = end_time - start_time
-            except ollama.ResponseError as e:
-                print(f"Ollama API error: {e}")
+            except Exception as e:
+                print(f"Error running the Ollama model: {e}")
                 return
         else:
             # Initialize OpenVINO pipeline

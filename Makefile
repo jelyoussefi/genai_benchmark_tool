@@ -13,6 +13,9 @@ PROMPT_FILE ?= user_prompt.txt
 DEVICE ?= GPU
 USE_OLLAMA ?= True
 
+ifeq ("$(DEVICE)","XPU")
+	CACHE_DIR := /root/.ollama
+endif
 # Docker run options
 DOCKER_RUN_OPTS = \
     -it --rm --privileged \
