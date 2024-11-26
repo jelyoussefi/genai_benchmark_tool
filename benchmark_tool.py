@@ -2,7 +2,7 @@ import time
 from tabulate import tabulate  # For table formatting
 import openvino_genai
 import fire  # For argument parsing
-import ollama  # Import Ollama's Python client
+from ollama import chat  # Import Ollama's chat method
 import subprocess  # For running shell commands
 from utils import ensure_chat_template, get_device_name  # Importing functions from utils.py
 
@@ -15,11 +15,9 @@ token_count = 0
 generated_answer = ""  # Variable to store the generated answer
 
 
-def streamer(subword):
-    global token_count, generated_answer
-    token_count += len(subword.split())
-    generated_answer += subword  # Capture the generated subword/response
-    return False  # Continue generation
+def count_tokens(text):
+    """Helper function to count the number of tokens in a text."""
+    return len(text.split())
 
 
 class BenchmarkingTool:
@@ -64,6 +62,29 @@ class BenchmarkingTool:
             print(f"Command Output: {e.output}")
             raise
 
+    def run_ollama_chat(self, model_name, prompt):
+        """Run the Ollama model using the `chat` method with streaming."""
+        global token_count, generated_answer
+        token_count = 0
+        generated_answer = ""
+
+        try:
+            messages = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": prompt}
+            ]
+            stream = chat(model=model_name, messages=messages, stream=True)
+
+            for chunk in stream:
+                content = chunk["message"]["content"]
+                token_count += count_tokens(content)  # Count tokens in each chunk
+                generated_answer += content  # Accumulate response
+
+            return generated_answer.strip()
+        except Exception as e:
+            print(f"Error running the Ollama model: {e}")
+            raise
+
     def run(self):
         """Run the benchmarking tool."""
         global token_count, generated_answer
@@ -83,14 +104,11 @@ class BenchmarkingTool:
             self.initialize_ollama()
             start_time = time.time()
             try:
-                # Use the Ollama Python client for run
-                response = ollama.run(
-                    model=self.model_name,
-                    prompt=full_prompt
-                )
-                print("Received response from Ollama.")
+                # Use the Ollama chat method
+                response = self.run_ollama_chat(self.model_name, prompt_content)
+                print("\nReceived response from Ollama.")
                 end_time = time.time()
-                generated_answer = response["content"]  # Extract generated content
+                generated_answer = response  # Capture the generated response
                 inferencing_time = end_time - start_time
             except Exception as e:
                 print(f"Error running the Ollama model: {e}")
