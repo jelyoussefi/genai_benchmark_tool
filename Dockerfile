@@ -1,5 +1,5 @@
 # Base image
-FROM ubuntu:24.04
+FROM intel/oneapi
 
 # Non-interactive setup
 ARG DEBIAN_FRONTEND=noninteractive
@@ -22,20 +22,18 @@ RUN apt update -y
 
 # Install pip using get-pip.py
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11 && \
-    pip3 install --upgrade pip 
+    pip install --upgrade pip 
 
-RUN pip3 install tabulate fire
+RUN pip install tabulate fire
 
 # Intel GPU Drivers
-RUN wget -qO - https://repositories.intel.com/gpu/intel-graphics.key | \
-  gpg --yes --dearmor --output /usr/share/keyrings/intel-graphics.gpg
-RUN echo "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu noble client" | \
-  tee /etc/apt/sources.list.d/intel-gpu-noble.list
-RUN apt update -y
-RUN apt install -y libze1 intel-level-zero-gpu intel-opencl-icd clinfo 
+RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | tee /usr/share/keyrings/intel-oneapi-archive-keyring.gpg > /dev/null && \
+    echo "deb [signed-by=/usr/share/keyrings/intel-oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main " | tee /etc/apt/sources.list.d/oneAPI.list && \
+    chmod 644 /usr/share/keyrings/intel-oneapi-archive-keyring.gpg && \
+    rm /etc/apt/sources.list.d/intel-graphics.list 
 
 RUN apt update -y
-RUN apt install -y xpu-smi intel-gpu-tools
+RUN apt install -y libze1 intel-level-zero-gpu intel-opencl-icd clinfo 
 
 # Intel NPU Drivers
 WORKDIR /tmp
@@ -45,14 +43,18 @@ RUN wget https://github.com/intel/linux-npu-driver/releases/download/v1.10.0/int
     dpkg -i *.deb && rm -f *.deb
 
 # OpenVINO GenAI 
-RUN pip3 install -U --pre openvino-genai openvino openvino-tokenizers[transformers] \
+RUN pip install -U --pre openvino-genai openvino openvino-tokenizers[transformers] \
 	 --extra-index-url https://storage.openvinotoolkit.org/simple/wheels/nightly 
-RUN pip3 install --extra-index-url https://download.pytorch.org/whl/cpu \
+RUN pip install --extra-index-url https://download.pytorch.org/whl/cpu \
 	"git+https://github.com/huggingface/optimum-intel.git" \
 	"git+https://github.com/openvinotoolkit/nncf.git" "onnx<=1.16.1"
 
 # IPEX
-RUN pip3 install torch==2.3.1+cxx11.abi torchvision==0.18.1+cxx11.abi torchaudio==2.3.1+cxx11.abi \
-	intel-extension-for-pytorch==2.3.110+xpu \
-	oneccl_bind_pt==2.3.100+xpu --extra-index-url \
-	https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
+RUN pip install --upgrade requests argparse urllib3 && \
+    pip install --pre --upgrade ipex-llm[cpp] && \
+    # Fix Trivy CVE Issues
+    pip install transformers==4.36.2 && \
+    pip install transformers_stream_generator einops tiktoken
+
+RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN pip install ollama
