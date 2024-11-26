@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# Benchmarking tool for Hugging Face models with OpenVINO
 import time
 from tabulate import tabulate  # For table formatting
 import openvino_genai
@@ -21,12 +19,13 @@ def streamer(subword):
     generated_answer += subword  # Capture the generated subword/response
     return False  # Continue generation
 
-
 class BenchmarkingTool:
-    def __init__(self, model_dir, prompt, device="GPU"):
+    def __init__(self, model_dir, prompt, system_prompt, device="GPU", output_file="answer.txt"):
         self.model_dir = model_dir
         self.prompt = prompt
+        self.system_prompt = system_prompt  # New system prompt parameter
         self.device = device
+        self.output_file = output_file  # Output file for the generated answer
 
     def run(self):
         """Run the benchmarking tool."""
@@ -35,22 +34,25 @@ class BenchmarkingTool:
         generated_answer = ""  # Reset generated answer
 
         # Ensure chat_template exists
-        ensure_chat_template(self.model_dir)
+        # ensure_chat_template(self.model_dir)
 
         # Load the prompt
         with open(self.prompt, "r") as file:
             prompt_content = file.read().strip()
 
+        # Prepend the system prompt to the user's prompt
+        full_prompt = self.system_prompt + "\nUser: " + prompt_content
+
         # Initialize pipeline
         pipe = openvino_genai.LLMPipeline(self.model_dir, self.device)
         config = openvino_genai.GenerationConfig()
-        #config.max_new_tokens = 1000
+        config.max_new_tokens = 1000
 
         # Benchmarking
         pipe.start_chat()
         start_time = time.time()
         try:
-            pipe.generate(prompt_content, config, streamer)
+            pipe.generate(full_prompt, config, streamer)  # Use the full prompt with system instruction
         finally:
             end_time = time.time()
             pipe.finish_chat()
@@ -76,23 +78,27 @@ class BenchmarkingTool:
         print(f"{RED}Benchmark Results:{RESET}")  # "Benchmark Results:" in red
         print(tabulate(results, tablefmt="grid"))
 
-        # Print the generated answer
-        print(f"\n{RED}Generated Answer:{RESET}\n{generated_answer}\n")
+        # Save the generated answer to a text file
+        with open(self.output_file, "w") as output_file:
+            output_file.write(generated_answer)
 
-        # Print two empty lines after the table
+        # Print where the answer is saved
+        print(f"\n{RED}Generated answer saved to:{RESET} {self.output_file}")
+
+        # Optionally, print two empty lines after the table
         print()  # Empty line
         print()  # Another empty line
-
 
 def main(
     model_dir: str,
     prompt: str,
+    system_prompt: str = "You are a helpful assistant.",  # Default system prompt
     device: str = "GPU",
+    output_file: str = "answer.txt",  # Default output file name
 ):
     """Benchmarking the Hugging Face model with OpenVINO."""
-    tool = BenchmarkingTool(model_dir=model_dir, prompt=prompt, device=device)
+    tool = BenchmarkingTool(model_dir=model_dir, prompt=prompt, system_prompt=system_prompt, device=device, output_file=output_file)
     tool.run()
-
 
 if __name__ == "__main__":
     fire.Fire(main)

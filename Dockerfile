@@ -24,13 +24,18 @@ RUN apt update -y
 RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11 && \
     pip3 install --upgrade pip 
 
+RUN pip3 install tabulate fire
+
 # Intel GPU Drivers
 RUN wget -qO - https://repositories.intel.com/gpu/intel-graphics.key | \
   gpg --yes --dearmor --output /usr/share/keyrings/intel-graphics.gpg
 RUN echo "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu noble client" | \
   tee /etc/apt/sources.list.d/intel-gpu-noble.list
 RUN apt update -y
-RUN apt install -y libze1 intel-level-zero-gpu intel-opencl-icd clinfo
+RUN apt install -y libze1 intel-level-zero-gpu intel-opencl-icd clinfo 
+
+RUN apt update -y
+RUN apt install -y xpu-smi intel-gpu-tools
 
 # Intel NPU Drivers
 WORKDIR /tmp
@@ -46,4 +51,8 @@ RUN pip3 install --extra-index-url https://download.pytorch.org/whl/cpu \
 	"git+https://github.com/huggingface/optimum-intel.git" \
 	"git+https://github.com/openvinotoolkit/nncf.git" "onnx<=1.16.1"
 
-RUN pip3 install tabulate fire
+# IPEX
+RUN pip3 install torch==2.3.1+cxx11.abi torchvision==0.18.1+cxx11.abi torchaudio==2.3.1+cxx11.abi \
+	intel-extension-for-pytorch==2.3.110+xpu \
+	oneccl_bind_pt==2.3.100+xpu --extra-index-url \
+	https://pytorch-extension.intel.com/release-whl/stable/xpu/us/
